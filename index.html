@@ -287,11 +287,11 @@
 <header>
   <div class="logo">Study<span>AI</span></div>
   <div class="api-row">
-    <input id="apiKey" type="password" placeholder="Paste your OpenAI API key (sk-...)"/>
+    <input id="apiKey" type="password" placeholder="Paste your Gemini API key (AIza...)"/>
     <select id="modelSelect">
-      <option value="gpt-4o-mini">GPT-4o mini</option>
-      <option value="gpt-4o">GPT-4o</option>
-      <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+      <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+      <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+      <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
     </select>
   </div>
   <button class="clear-btn" onclick="clearChat()">↺ Clear</button>
@@ -330,7 +330,7 @@
   });
 
   // Load saved key
-  const savedKey = localStorage.getItem('oai_key');
+  const savedKey = localStorage.getItem('gemini_key');
   if (savedKey) document.getElementById('apiKey').value = savedKey;
 
   function clearChat() {
@@ -406,11 +406,11 @@
     if (!text) return;
 
     const key = document.getElementById('apiKey').value.trim();
-    if (!key.startsWith('sk-')) {
-      showToast('Please paste a valid OpenAI API key (starts with sk-)');
+    if (!key.startsWith('AIza')) {
+      showToast('Please paste a valid Gemini API key (starts with AIza)');
       return;
     }
-    localStorage.setItem('oai_key', key);
+    localStorage.setItem('gemini_key', key);
 
     const model = document.getElementById('modelSelect').value;
     messages.push({ role: 'user', content: text });
@@ -421,19 +421,17 @@
     showTyping();
 
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const geminiMessages = messages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: 'You are a helpful, knowledgeable tutor. Be concise but thorough. Format code in markdown code blocks.' },
-            ...messages
-          ],
-          max_tokens: 1500
+          system_instruction: { parts: [{ text: 'You are a helpful, knowledgeable tutor. Be concise but thorough. Format code in markdown code blocks.' }] },
+          contents: geminiMessages
         })
       });
 
@@ -441,12 +439,12 @@
 
       if (data.error) {
         removeTyping();
-        showToast('OpenAI Error: ' + data.error.message);
+        showToast('Gemini Error: ' + data.error.message);
         messages.pop();
         return;
       }
 
-      const reply = data.choices[0].message.content;
+      const reply = data.candidates[0].content.parts[0].text;
       messages.push({ role: 'assistant', content: reply });
       removeTyping();
       addMessage('assistant', reply);
